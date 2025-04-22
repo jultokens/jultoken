@@ -1,4 +1,87 @@
- cd nom d'utilisateur .github.io
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Assistant IA Vocal</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; }
+    #start { color: green; text-decoration: underline; cursor: pointer; font-size: 1.2rem; }
+    #result, #response { margin-top: 1rem; }
+  </style>
+</head>
+<body>
 
- echo "Bonjour tout le monde" > index.html
+  <h1>🎤 Assistant IA Vocal</h1>
+  <div id="start">▶️ Démarrer la conversation</div>
 
+  <div id="result"><strong>Tu as dit :</strong> <span></span></div>
+  <div id="response"><strong>Réponse IA :</strong> <span></span></div>
+
+  <script>
+    const startDiv = document.getElementById('start');
+    const resultSpan = document.querySelector('#result span');
+    const responseSpan = document.querySelector('#response span');
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    let isRunning = false;
+
+    startDiv.onclick = () => {
+      if (!isRunning) {
+        isRunning = true;
+        startDiv.textContent = "⏳ Assistant en cours...";
+        listen();
+      }
+    };
+
+    function listen() {
+      recognition.start();
+    }
+
+    recognition.onresult = function(event) {
+      const text = event.results[0][0].transcript;
+      resultSpan.textContent = text;
+
+      // Envoi au serveur Flask
+      fetch("http://localhost:5000/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ message: text })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const aiResponse = data.choices?.[0]?.message?.content || "(aucune réponse)";
+        responseSpan.textContent = aiResponse;
+
+        // Lecture vocale de la réponse
+        const utterance = new SpeechSynthesisUtterance(aiResponse);
+        utterance.lang = 'fr-FR';
+        utterance.onend = () => {
+          // Réécoute une fois la réponse terminée
+          setTimeout(() => {
+            listen();
+          }, 500);
+        };
+        speechSynthesis.speak(utterance);
+      })
+      .catch(err => {
+        responseSpan.textContent = "Erreur : " + err.message;
+        isRunning = false;
+        startDiv.textContent = "❌ Erreur - Recommencer";
+      });
+    };
+
+    recognition.onerror = function(event) {
+      resultSpan.textContent = "Erreur reconnaissance vocale : " + event.error;
+      isRunning = false;
+      startDiv.textContent = "❌ Micro Erreur - Recommencer";
+    };
+  </script>
+
+</body>
+</html>
